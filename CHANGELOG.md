@@ -1,0 +1,118 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [1.4.0] - 2026-04-04
+
+### Added
+
+- **Multi-target suggestion types** — the advisor can now suggest changes beyond agent `.md` files. New types:
+  - `improve-rules` — appends delegation rules to `CLAUDE.md` so the orchestrator knows when to invoke existing agents
+  - `new-skill` / `improve-skill` — proposes new or improved skills (written to `skills/<name>/SKILL.md`) that chain agents into workflows
+  - `new-command` / `improve-command` — proposes new or improved commands (written to `.claude/commands/<name>.md`) that leverage agents
+- **Underutilization detection in the advisor skill** — cross-references `.claude/agents/` against collected metrics to identify agents with zero or very few runs relative to orchestrator activity.
+- **Root cause diagnosis** — for each underutilized agent the advisor checks whether it is referenced in `CLAUDE.md`, in any skill, or in any command, and selects the most appropriate suggestion type to fix the gap.
+- **Orchestrator overload matching** — compares the orchestrator's tool-use frequency against agent capabilities to identify work that should be delegated to subagents.
+- **Prioritized suggestion generation** — rules suggestions (`improve-rules`) are generated first, followed by agent improvements, then new skills and commands.
+- **Dashboard badge styles** for all new suggestion types (`improve-rules`, `new-skill`, `improve-skill`, `new-command`, `improve-command`), each using an appropriate accent color.
+- **Dynamic approve tooltips** — the approve button tooltip now shows the actual target path and reads "Append to CLAUDE.md" for `improve-rules` suggestions instead of "Write to …".
+- **Diff rendering for all types** — the suggestion detail diff view works for every suggestion type that provides an `existingFile`, including an append-preview for `CLAUDE.md` changes.
+
+### Changed
+
+- `validateAgentPath()` on the server replaced by `validateSuggestionPath(type, path)` — an allowlist-based validator that enforces path rules for all seven suggestion types: `new-agent` and `improve-agent` must target `.claude/agents/*.md`; `improve-rules` must target `CLAUDE.md`; `new-skill` and `improve-skill` must target `skills/*/SKILL.md`; `new-command` and `improve-command` must target `.claude/commands/*.md`.
+- `writeAgentFile()` on the server replaced by `writeSuggestionFile(suggestion)` — handles all target paths with write mode for new files and append mode for `CLAUDE.md` (`improve-rules` type).
+- Suggestion ingestion (`POST /api/advisor/suggestions`) now validates the `type` field against the allowlist and rejects unknown types with a 400 response.
+
+## [Unreleased]
+
+### Added
+
+- **Session Performance Analytics page** (`#/analytics`) — Canvas-based multi-series line chart visualizing session history over time. No external chart library; built entirely on the HTML5 Canvas API.
+  - 5 tracked metrics: Agent Count, Skill Count, Total Tokens, Error Count, Session Duration
+  - Interactive metric toggle chips to show or hide individual series
+  - Date range filter with from/to date inputs
+  - Dual Y-axes: left axis for count-scale metrics, right axis for tokens and duration
+  - Hover tooltips showing all active metric values for the nearest session point
+  - Responsive redraw via `ResizeObserver` — chart adjusts automatically when the panel is resized
+  - Real-time updates triggered by `session-archived` and `session-update` WebSocket events
+  - Theme-aware canvas rendering: redraws on dark/light theme switch so colors stay consistent
+- `skillCount` and `uniqueSkills` fields added to session state tracking on the server — accumulated as `Skill` tool-use events arrive and archived with each session record; exposed via `GET /api/sessions` and `GET /api/sessions/:id` for the Analytics chart.
+
+- Light/dark/auto theme toggle in the dashboard sidebar. "Auto" follows the OS `prefers-color-scheme` preference. The selected theme persists in `localStorage` and is applied before first paint to prevent a flash of the wrong theme.
+- Smooth 0.3s transition animation when switching themes.
+- All dashboard colors converted from hardcoded values to CSS custom properties, enabling correct theme switching across every component.
+- Light theme uses a warm off-white palette (`#f5f5f7` base, `#ffffff` surface) for comfortable daytime use.
+
+### Fixed
+
+- Worktree subagents (spawned with `isolation: "worktree"`) no longer appear as separate project tabs in the dashboard. The server now detects `.claude/worktrees/` paths via a `resolveWorktreeParentCwd()` helper and redirects all worktree events to the parent project. Session start/end and stop events from worktree sessions are also suppressed to prevent phantom archive entries. Stale worktree entries are skipped when loading the projects registry on startup.
+
+## [1.3.0] - 2026-04-04
+
+### Added
+
+- **Session history** — sessions are automatically archived when they end and persisted to `.claude/advisor-data/sessions.json` (up to 50 sessions per project).
+- **Sessions list page** (`#/sessions`) — new sidebar nav item shows a table of all recorded sessions with date, duration, agent count, token usage, and error count, sorted most-recent-first.
+- **Session detail page** (`#/sessions/:id`) — three-tab view for any archived or active session:
+  - *Agents* — card grid snapshot of agent states for that session
+  - *Activity* — filtered activity log for that session
+  - *Metrics* — token and error totals plus a per-agent-type breakdown table
+- **Session selector on the dashboard page** — dropdown in the session stats bar lets you switch between the live current session and any historical session without leaving the dashboard.
+- **Session filter on the agent detail runs tab** — runs table now includes a Session column with links and a dropdown to filter runs by session.
+- **`GET /api/sessions`** — returns all archived and active sessions for a project, sorted most-recent-first.
+- **`GET /api/sessions/:id`** — returns full detail for one session: agents, activity log, and metrics breakdown.
+- **`GET /api/advisor/metrics?session=SESSION_ID`** — filters accumulated metrics to runs from a specific session, enabling per-session advisor analysis.
+- **`session-archived` WebSocket message** — broadcast when a session ends so the Sessions list page updates in real time without polling.
+- **`sessionCount`** field added to the `full-state` payload so the UI can show how many sessions have been recorded.
+- **Cross-session analysis** added to the `/agent-advisor:advisor` skill — the skill now fetches session history and compares trends across sessions when generating suggestions.
+
+### Fixed
+
+- `sessionId` is now cleared in server state when a session ends, preventing stale session IDs from being carried into the next session and creating phantom "active" entries in the sessions list.
+
+## [1.2.1] - 2026-04-04
+
+### Changed
+
+- Agent cards no longer show a redundant status dot or a separate error badge; status is conveyed by a left-border accent color instead of a glow effect.
+- Skills and tools on agent cards are now collapsed into an expandable summary element rather than listed inline, reducing visual noise.
+- Token counts are merged into the card footer row instead of occupying their own line.
+- Session stats (Defined, Active, Spawned counts) moved from a collapsible grid into the session bar, making them always visible.
+- Activity log height reduced and the log header is now sticky inline, keeping context visible while scrolling.
+- Spacing tightened across the sidebar, agent grid, page content area, and advisor panel.
+
+## [1.2.0] - 2026-04-04
+
+### Added
+
+- Project tabs now display a close button (visible on hover) that removes the project from the dashboard and server state via a new `DELETE /api/projects` endpoint.
+- `isTempProject()` filter on the server suppresses internal and temporary projects (`.paperclip/instances/` paths, UUID-prefixed names, and `_default`) from the project tabs list.
+- `privacy-policy.html` — self-contained privacy policy page for GitHub Pages, styled to match the dashboard dark theme. Confirms no data collection, all-local operation, and MIT license.
+- Author URL field in `.claude-plugin/plugin.json`.
+- Versioning & release tagging guidelines in `CLAUDE.md`.
+
+### Changed
+
+- Project tabs moved from the sidebar into the main content area, sitting above the page content where breadcrumbs previously appeared.
+- Project tab background now uses `var(--bg-surface)` instead of `var(--sidebar-bg)` to match the main area.
+
+### Removed
+
+- Breadcrumb navigation bar removed from the main content area. Navigation context is now provided by the sidebar active state alone.
+
+## [1.1.0] - 2026-04-04
+
+### Added
+
+- `scripts/install.mjs` — a proper Node.js install script that replaces the inline one-liner in `install.bat`. It registers the marketplace, writes the installed-plugins list, enables the plugin in `settings.json`, installs both skills to `~/.claude/skills/`, and cleans up the obsolete local `.claude/skills/advisor/` directory.
+- `stop_server.bat` — Windows helper to stop any running server process on port 8099 without needing to hunt for the PID manually.
+- `SessionStart` hook now POSTs to `/hooks/register-project` (with the current working directory) after auto-starting the server, enabling reliable cross-project monitoring from a single global install.
+
+### Changed
+
+- `install.bat` now delegates to `scripts/install.mjs` via `node` instead of embedding a minified one-liner. The script is idempotent and handles all nine hook events including `SessionStart`, `Stop`, `Notification`, `PostToolUseFailure`, and `SessionEnd` which the previous version missed.
+- `start.bat` now waits for the server to become ready (polling `/api/state` up to 10 times) before reporting success, eliminating a race condition where the script exited before the server was accepting connections.
+- Skills are now installed globally to `~/.claude/skills/` with absolute paths substituted in, so they work from any project directory.

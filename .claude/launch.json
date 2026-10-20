@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "agent-advisor",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/server.mjs"],
+      "port": 8099,
+      "autoPort": false
+    }
+  ]
+}
